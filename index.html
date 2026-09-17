@@ -262,6 +262,11 @@
   .up { color: var(--up); }
   .down { color: var(--down); }
   .flat { color: var(--muted); }
+  .world-note {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+  }
   .note {
     margin: 10px 0 0;
     font-size: 12.5px;
@@ -314,6 +319,7 @@
   const REPOS = { top10: "newsdelivery", world: "daily-intl-news", econ: "daily-econ-stats" };
   const LABELS = { top10: "뉴스보이 Top 10", world: "World Top 10", econ: "경제지표" };
   const TAB_ORDER = ["top10", "world", "econ"];
+  const WORLD_OUTLETS = ["Reuters", "AP", "BBC", "The Guardian", "NPR", "NBC News", "DW", "The New York Times"];
 
   const raw = (repo, path) =>
     `https://raw.githubusercontent.com/${GITHUB_USER}/${repo}/${BRANCH}/${path}`;
@@ -583,6 +589,14 @@
       ol.appendChild(li);
     });
     body.appendChild(ol);
+
+    // 하단 집계 방식 안내 (그날 실제로 수집된 언론사 기준)
+    const collected = data.feeds && data.feeds.length ? data.feeds : WORLD_OUTLETS;
+    const outlets = WORLD_OUTLETS.filter((o) => collected.includes(o));
+    const note = document.createElement("p");
+    note.className = "note world-note";
+    note.textContent = `* 집계 방식: ${outlets.join(", ")}의 헤드라인을 수합하여 AI로 요약`;
+    body.appendChild(note);
   }
 
   function formatValue(item) {
