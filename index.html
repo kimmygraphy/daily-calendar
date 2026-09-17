@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>데일리 캘린더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F7F9;
+    --ink: #1B2130;
+    --muted: #767D8B;
+    --faint: #C3C8D0;
+    --rule: #E1E4E9;
+    --accent: #2C4A78;
+    --on-accent: #FFFFFF;
+    --hover: #EBEEF2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181E;
+      --ink: #E4E7EC;
+      --muted: #8D94A1;
+      --faint: #474D58;
+      --rule: #2A2F38;
+      --accent: #A9BEDF;
+      --on-accent: #15181E;
+      --hover: #20242C;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Serif KR", "AppleMyungjo", "Nanum Myeongjo", "Batang", serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  .app {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 20px 64px;
+  }
+
+  /* ---------- 달력 머리 ---------- */
+  .year-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 4px 0;
+    font-size: 15px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .month-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 12px 0 28px;
+  }
+  .month-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0 4px;
+    font-size: 44px;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-align: center;
+    text-align-last: center;
+    cursor: pointer;
+  }
+  .arrow {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .arrow:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+  .arrow:disabled { color: var(--faint); cursor: default; }
+
+  /* ---------- 달력 ---------- */
+  .weekdays, .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+  .weekdays {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 8px;
+  }
+  .day {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+  .day span {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 16px;
+  }
+  .day:disabled { color: var(--faint); cursor: default; }
+  .day:not(:disabled) { cursor: pointer; }
+  .day:not(:disabled):hover span { background: var(--hover); }
+  .day[aria-pressed="true"] span,
+  .day[aria-pressed="true"]:hover span {
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 700;
+  }
+
+  /* ---------- 리스트 패널 ---------- */
+  .panel {
+    margin-top: 36px;
+    border-top: 1px solid var(--rule);
+    padding-top: 24px;
+  }
+  .panel-date {
+    margin: 0 0 16px;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .tabs {
+    display: flex;
+    gap: 24px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 8px;
+  }
+  .tab {
+    border: 0;
+    background: transparent;
+    padding: 8px 0 10px;
+    margin-bottom: -1px;
+    font-size: 15px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+  }
+  .tab[aria-selected="true"] {
+    color: var(--ink);
+    font-weight: 700;
+    border-bottom-color: var(--ink);
+  }
+
+  .period {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 14px 0 4px;
+  }
+  .news { list-style: none; margin: 0; padding: 0; }
+  .news li {
+    display: grid;
+    grid-template-columns: 2.2em 1fr;
+    gap: 4px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .news li:last-child { border-bottom: 0; }
+  .rank {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+  .news li:nth-child(-n+3) .rank { color: var(--accent); }
+  .news a {
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .news a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .summary {
+    margin: 6px 0 0;
+    font-size: 14.5px;
+    line-height: 1.75;
+    color: var(--muted);
+  }
+  .count {
+    display: block;
+    margin-top: 6px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .message {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .fade { animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .fade { animation: none; } }
+
+  /* ---------- PC 레이아웃 ---------- */
+  @media (min-width: 768px) {
+    .app {
+      display: grid;
+      grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+      gap: 64px;
+      align-items: start;
+      padding-top: 48px;
+    }
+    .calendar { position: sticky; top: 48px; }
+    .panel {
+      margin-top: 0;
+      border-top: 0;
+      padding-top: 58px;
+      max-width: 620px;
+    }
+    .panel-date { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="calendar" aria-label="달력">
+    <select class="year-select" id="yearSelect" aria-label="연도 선택"></select>
+    <div class="month-bar">
+      <button class="arrow" id="prevBtn" aria-label="이전 달">‹</button>
+      <select class="month-select" id="monthSelect" aria-label="월 선택"></select>
+      <button class="arrow" id="nextBtn" aria-label="다음 달">›</button>
+    </div>
+    <div class="weekdays" aria-hidden="true">
+      <div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div><div>일</div>
+    </div>
+    <div class="days" id="days"></div>
+  </section>
+
+  <section class="panel" id="panel" aria-live="polite"></section>
+</main>
+
+<script>
+  // ===== 설정 =====
+  const GITHUB_USER = "kimmygraphy";
+  const BRANCH = "main";
+  const raw = (repo, path) =>
+    `https://raw.githubusercontent.com/${GITHUB_USER}/${repo}/${BRANCH}/${path}`;
+
+  const SOURCES = {
+    top10: {
+      index: raw("newsdelivery", "data/index.json"),
+      day: (date) => raw("newsdelivery", `data/${date}.json`),
+    },
+    // econ: 추후 daily-econ 저장소 연결
+  };
+
+  const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+  // ===== 상태 =====
+  const state = {
+    top10Dates: new Set(),
+    loadError: false,
+    minYM: null,          // {y, m}
+    maxYM: null,
+    view: null,           // 현재 보고 있는 {y, m}
+    selected: null,       // "YYYY-MM-DD"
+    tab: "top10",
+    cache: new Map(),
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymKey = ({ y, m }) => y * 12 + (m - 1);
+  const fromKey = (k) => ({ y: Math.floor(k / 12), m: (k % 12) + 1 });
+
+  function todayKST() {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+  }
+
+  function hasData(date) {
+    return state.top10Dates.has(date); // 경제지표 연결 시 || econDates.has(date)
+  }
+
+  // ===== 달력 =====
+  function renderSelectors() {
+    const { y, m } = state.view;
+    const yearSel = $("yearSelect");
+    const monthSel = $("monthSelect");
+
+    yearSel.innerHTML = "";
+    for (let yy = state.minYM.y; yy <= state.maxYM.y; yy++) {
+      yearSel.add(new Option(`${yy}년`, yy, false, yy === y));
+    }
+
+    monthSel.innerHTML = "";
+    const lo = y === state.minYM.y ? state.minYM.m : 1;
+    const hi = y === state.maxYM.y ? state.maxYM.m : 12;
+    for (let mm = lo; mm <= hi; mm++) {
+      monthSel.add(new Option(`${mm}월`, mm, false, mm === m));
+    }
+
+    $("prevBtn").disabled = ymKey(state.view) <= ymKey(state.minYM);
+    $("nextBtn").disabled = ymKey(state.view) >= ymKey(state.maxYM);
+  }
+
+  function renderDays() {
+    const { y, m } = state.view;
+    const container = $("days");
+    container.innerHTML = "";
+
+    const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7; // 월요일 시작
+    const total = new Date(y, m, 0).getDate();
+
+    for (let i = 0; i < lead; i++) container.appendChild(document.createElement("div"));
+
+    for (let d = 1; d <= total; d++) {
+      const date = `${y}-${pad(m)}-${pad(d)}`;
+      const btn = document.createElement("button");
+      btn.className = "day";
+      btn.innerHTML = `<span>${d}</span>`;
+      const available = hasData(date);
+      btn.disabled = !available;
+      btn.setAttribute("aria-pressed", String(date === state.selected));
+      btn.setAttribute("aria-label", `${m}월 ${d}일${available ? "" : ", 기록 없음"}`);
+      if (available) btn.addEventListener("click", () => selectDate(date));
+      container.appendChild(btn);
+    }
+  }
+
+  function setView(ym) {
+    const k = Math.min(Math.max(ymKey(ym), ymKey(state.minYM)), ymKey(state.maxYM));
+    state.view = fromKey(k);
+    renderSelectors();
+    renderDays();
+  }
+
+  // ===== 패널 =====
+  function formatDate(date) {
+    const [y, m, d] = date.split("-").map(Number);
+    const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()];
+    return `${m}월 ${d}일 ${wd}요일`;
+  }
+
+  function renderPanel() {
+    const panel = $("panel");
+    panel.innerHTML = "";
+
+    if (state.loadError) {
+      panel.innerHTML = `<p class="message">기록을 불러오지 못했어요. 잠시 후 새로고침하세요.</p>`;
+      return;
+    }
+    if (!state.selected) {
+      panel.innerHTML = `<p class="message">기록이 있는 날짜를 선택하세요.</p>`;
+      return;
+    }
+
+    const h = document.createElement("h2");
+    h.className = "panel-date";
+    h.textContent = formatDate(state.selected);
+    panel.appendChild(h);
+
+    const tabs = document.createElement("div");
+    tabs.className = "tabs";
+    tabs.setAttribute("role", "tablist");
+    [["top10", "데일리 TOP10"], ["econ", "경제지표"]].forEach(([id, label]) => {
+      const t = document.createElement("button");
+      t.className = "tab";
+      t.setAttribute("role", "tab");
+      t.setAttribute("aria-selected", String(state.tab === id));
+      t.textContent = label;
+      t.addEventListener("click", () => { state.tab = id; renderPanel(); });
+      tabs.appendChild(t);
+    });
+    panel.appendChild(tabs);
+
+    const body = document.createElement("div");
+    body.className = "fade";
+    panel.appendChild(body);
+
+    if (state.tab === "econ") {
+      body.innerHTML = `<p class="message">경제지표는 준비 중이에요.</p>`;
+    } else {
+      renderTop10(body, state.selected);
+    }
+  }
+
+  async function renderTop10(body, date) {
+    if (!state.top10Dates.has(date)) {
+      body.innerHTML = `<p class="message">이 날짜에는 데일리 TOP10 기록이 없어요.</p>`;
+      return;
+    }
+
+    let data = state.cache.get(date);
+    if (!data) {
+      body.innerHTML = `<p class="message">불러오는 중…</p>`;
+      try {
+        const res = await fetch(SOURCES.top10.day(date), { cache: "no-store" });
+        if (!res.ok) throw new Error(res.status);
+        data = await res.json();
+        state.cache.set(date, data);
+      } catch (e) {
+        body.innerHTML = `<p class="message">이 날짜의 기록을 불러오지 못했어요. 잠시 후 다시 선택하세요.</p>`;
+        return;
+      }
+      // 기다리는 사이 다른 날짜나 탭으로 바뀌었으면 그리지 않음
+      if (state.selected !== date || state.tab !== "top10") return;
+    }
+
+    body.innerHTML = "";
+    if (data.period) {
+      const p = document.createElement("p");
+      p.className = "period";
+      p.textContent = data.period;
+      body.appendChild(p);
+    }
+
+    const ol = document.createElement("ol");
+    ol.className = "news";
+    (data.items || []).forEach((it) => {
+      const li = document.createElement("li");
+
+      const rank = document.createElement("div");
+      rank.className = "rank";
+      rank.textContent = it.rank;
+
+      const main = document.createElement("div");
+      const a = document.createElement("a");
+      a.href = it.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = it.title;
+      main.appendChild(a);
+
+      if (it.summary) {
+        const s = document.createElement("p");
+        s.className = "summary";
+        s.textContent = it.summary;
+        main.appendChild(s);
+      }
+      if (it.article_count) {
+        const c = document.createElement("span");
+        c.className = "count";
+        c.textContent = `기사 ${it.article_count}건 분석`;
+        main.appendChild(c);
+      }
+
+      li.append(rank, main);
+      ol.appendChild(li);
+    });
+    body.appendChild(ol);
+  }
+
+  function selectDate(date) {
+    state.selected = date;
+    renderDays();
+    renderPanel();
+  }
+
+  // ===== 이벤트 =====
+  $("prevBtn").addEventListener("click", () => setView(fromKey(ymKey(state.view) - 1)));
+  $("nextBtn").addEventListener("click", () => setView(fromKey(ymKey(state.view) + 1)));
+  $("yearSelect").addEventListener("change", (e) =>
+    setView({ y: Number(e.target.value), m: state.view.m }));
+  $("monthSelect").addEventListener("change", (e) =>
+    setView({ y: state.view.y, m: Number(e.target.value) }));
+
+  // ===== 시작 =====
+  async function init() {
+    const [ty, tm] = todayKST().split("-").map(Number);
+    state.maxYM = { y: ty, m: tm };
+
+    try {
+      const res = await fetch(SOURCES.top10.index, { cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      const dates = await res.json();
+      state.top10Dates = new Set(dates);
+    } catch (e) {
+      state.loadError = true;
+    }
+
+    const sorted = [...state.top10Dates].sort();
+    if (sorted.length) {
+      const [fy, fm] = sorted[0].split("-").map(Number);
+      state.minYM = ymKey({ y: fy, m: fm }) < ymKey(state.maxYM) ? { y: fy, m: fm } : { ...state.maxYM };
+    } else {
+      state.minYM = { ...state.maxYM };
+    }
+
+    // 이번 달 안에서 가장 최근 기록이 있는 날짜를 자동 선택
+    const prefix = `${ty}-${pad(tm)}-`;
+    const latestThisMonth = sorted.filter((d) => d.startsWith(prefix)).pop();
+    state.selected = latestThisMonth || null;
+
+    setView(state.maxYM);
+    renderPanel();
+  }
+
+  init();
+</script>
+</body>
+</html>
