@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Daily News & Econ Stats</title>
+<title>News Aggregator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -156,7 +156,10 @@
   }
   .tabs {
     display: flex;
-    gap: 24px;
+    gap: 22px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
     border-bottom: 1px solid var(--rule);
     margin-bottom: 8px;
   }
@@ -205,6 +208,7 @@
     line-height: 1.5;
   }
   .news a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .news span.world-title { font-size: 17px; font-weight: 700; line-height: 1.5; }
   .summary {
     margin: 6px 0 0;
     font-size: 14.5px;
@@ -307,8 +311,9 @@
   // ===== 설정 =====
   const GITHUB_USER = "kimmygraphy";
   const BRANCH = "main";
-  const REPOS = { top10: "newsdelivery", econ: "daily-econ-stats" };
-  const LABELS = { top10: "데일리 TOP10", econ: "경제지표" };
+  const REPOS = { top10: "newsdelivery", world: "daily-intl-news", econ: "daily-econ-stats" };
+  const LABELS = { top10: "뉴스보이 Top 10", world: "World Top 10", econ: "경제지표" };
+  const TAB_ORDER = ["top10", "world", "econ"];
 
   const raw = (repo, path) =>
     `https://raw.githubusercontent.com/${GITHUB_USER}/${repo}/${BRANCH}/${path}`;
@@ -321,8 +326,8 @@
 
   // ===== 상태 =====
   const state = {
-    dates: { top10: new Set(), econ: new Set() },
-    failed: { top10: false, econ: false },
+    dates: { top10: new Set(), world: new Set(), econ: new Set() },
+    failed: { top10: false, world: false, econ: false },
     minYM: null,
     maxYM: null,
     view: null,
@@ -341,7 +346,7 @@
   }
 
   function hasData(date) {
-    return state.dates.top10.has(date) || state.dates.econ.has(date);
+    return TAB_ORDER.some((src) => state.dates[src].has(date));
   }
 
   function prevWeekday(date) {
@@ -422,7 +427,7 @@
     const panel = $("panel");
     panel.innerHTML = "";
 
-    if (state.failed.top10 && state.failed.econ) {
+    if (TAB_ORDER.every((src) => state.failed[src])) {
       message(panel, "기록을 불러오지 못했어요. 잠시 후 새로고침하세요.");
       return;
     }
@@ -439,7 +444,7 @@
     const tabs = document.createElement("div");
     tabs.className = "tabs";
     tabs.setAttribute("role", "tablist");
-    ["top10", "econ"].forEach((src) => {
+    TAB_ORDER.forEach((src) => {
       const t = document.createElement("button");
       t.className = "tab";
       t.setAttribute("role", "tab");
@@ -485,21 +490,24 @@
 
     body.innerHTML = "";
     if (src === "top10") drawTop10(body, data);
+    else if (src === "world") drawWorld(body, data);
     else drawEcon(body, data, date);
   }
 
+  function addStamp(body, data) {
+    if (!data.crawled_at) return;
+    const stamp = new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul", month: "long", day: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).format(new Date(data.crawled_at));
+    const p = document.createElement("p");
+    p.className = "period";
+    p.textContent = `${stamp} 수집`;
+    body.appendChild(p);
+  }
+
   function drawTop10(body, data) {
-    if (data.crawled_at) {
-      const p = document.createElement("p");
-      p.className = "period";
-      const dt = new Date(data.crawled_at);
-      const stamp = new Intl.DateTimeFormat("ko-KR", {
-        timeZone: "Asia/Seoul", month: "long", day: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: false,
-      }).format(dt);
-      p.textContent = `${stamp} 수집`;
-      body.appendChild(p);
-    }
+    addStamp(body, data);
 
     const ol = document.createElement("ol");
     ol.className = "news";
@@ -529,6 +537,46 @@
         c.className = "count";
         c.textContent = `기사 ${it.article_count}건 분석`;
         main.appendChild(c);
+      }
+
+      li.append(rank, main);
+      ol.appendChild(li);
+    });
+    body.appendChild(ol);
+  }
+
+  function drawWorld(body, data) {
+    addStamp(body, data);
+
+    const ol = document.createElement("ol");
+    ol.className = "news";
+    (data.items || []).forEach((it) => {
+      const li = document.createElement("li");
+
+      const rank = document.createElement("div");
+      rank.className = "rank";
+      rank.textContent = it.rank;
+
+      const main = document.createElement("div");
+      const sources = it.sources || [];
+      const direct = sources.find((s) => !s.url.includes("news.google.com"));
+      const url = (direct || sources[0] || {}).url;
+
+      const title = document.createElement(url ? "a" : "span");
+      if (url) {
+        title.href = url;
+        title.target = "_blank";
+        title.rel = "noopener noreferrer";
+      }
+      title.className = "world-title";
+      title.textContent = it.headline;
+      main.appendChild(title);
+
+      if (it.summary) {
+        const s = document.createElement("p");
+        s.className = "summary";
+        s.textContent = it.summary;
+        main.appendChild(s);
       }
 
       li.append(rank, main);
