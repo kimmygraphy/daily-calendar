@@ -701,9 +701,9 @@
     const [ty, tm] = todayKST().split("-").map(Number);
     state.maxYM = { y: ty, m: tm };
 
-    await Promise.all([loadIndex("top10"), loadIndex("econ")]);
+    await Promise.all(TAB_ORDER.map(loadIndex));
 
-    const sorted = [...new Set([...state.dates.top10, ...state.dates.econ])].sort();
+    const sorted = [...new Set(TAB_ORDER.flatMap((src) => [...state.dates[src]]))].sort();
     if (sorted.length) {
       const [fy, fm] = sorted[0].split("-").map(Number);
       const first = { y: fy, m: fm };
