@@ -18,6 +18,8 @@
     --accent: #2C4A78;
     --on-accent: #FFFFFF;
     --hover: #EBEEF2;
+    --up: #C23B32;
+    --down: #2863B0;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -29,6 +31,8 @@
       --accent: #A9BEDF;
       --on-accent: #15181E;
       --hover: #20242C;
+      --up: #F08A80;
+      --down: #86AEE8;
     }
   }
 
@@ -223,6 +227,44 @@
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { .fade { animation: none; } }
 
+  /* ---------- 경제지표 ---------- */
+  .econ-group {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .econ-group:last-child { border-bottom: 0; }
+  .econ-group h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .econ-row {
+    display: grid;
+    grid-template-columns: 1fr auto 5.4em;
+    align-items: baseline;
+    gap: 12px;
+    padding: 7px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .econ-name { font-size: 16px; }
+  .basis {
+    margin-left: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .econ-value { font-size: 17px; font-weight: 700; text-align: right; }
+  .econ-pct { font-size: 14.5px; text-align: right; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .flat { color: var(--muted); }
+  .note {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
   /* ---------- PC 레이아웃 ---------- */
   @media (min-width: 768px) {
     .app {
@@ -265,27 +307,26 @@
   // ===== 설정 =====
   const GITHUB_USER = "kimmygraphy";
   const BRANCH = "main";
+  const REPOS = { top10: "newsdelivery", econ: "daily-econ" };
+  const LABELS = { top10: "데일리 TOP10", econ: "경제지표" };
+
   const raw = (repo, path) =>
     `https://raw.githubusercontent.com/${GITHUB_USER}/${repo}/${BRANCH}/${path}`;
-
-  const SOURCES = {
-    top10: {
-      index: raw("newsdelivery", "data/index.json"),
-      day: (date) => raw("newsdelivery", `data/${date}.json`),
-    },
-    // econ: 추후 daily-econ 저장소 연결
-  };
+  const indexUrl = (src) => raw(REPOS[src], "data/index.json");
+  const dayUrl = (src, date) => raw(REPOS[src], `data/${date}.json`);
 
   const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  const ECON_GROUPS = [["kr", "한국"], ["us", "미국"], ["fx", "환율 · 금"]];
+  const US_NOTE = "* 미국 지수는 한국 시간 기준 전날 밤 마감한 장의 종가예요.";
 
   // ===== 상태 =====
   const state = {
-    top10Dates: new Set(),
-    loadError: false,
-    minYM: null,          // {y, m}
+    dates: { top10: new Set(), econ: new Set() },
+    failed: { top10: false, econ: false },
+    minYM: null,
     maxYM: null,
-    view: null,           // 현재 보고 있는 {y, m}
-    selected: null,       // "YYYY-MM-DD"
+    view: null,
+    selected: null,
     tab: "top10",
     cache: new Map(),
   };
@@ -300,7 +341,14 @@
   }
 
   function hasData(date) {
-    return state.top10Dates.has(date); // 경제지표 연결 시 || econDates.has(date)
+    return state.dates.top10.has(date) || state.dates.econ.has(date);
+  }
+
+  function prevWeekday(date) {
+    const [y, m, d] = date.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    do { dt.setUTCDate(dt.getUTCDate() - 1); } while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6);
+    return dt.toISOString().slice(0, 10);
   }
 
   // ===== 달력 =====
@@ -359,20 +407,27 @@
   // ===== 패널 =====
   function formatDate(date) {
     const [y, m, d] = date.split("-").map(Number);
-    const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()];
-    return `${m}월 ${d}일 ${wd}요일`;
+    return `${m}월 ${d}일 ${WEEKDAYS[new Date(y, m - 1, d).getDay()]}요일`;
+  }
+
+  function message(el, text) {
+    el.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "message";
+    p.textContent = text;
+    el.appendChild(p);
   }
 
   function renderPanel() {
     const panel = $("panel");
     panel.innerHTML = "";
 
-    if (state.loadError) {
-      panel.innerHTML = `<p class="message">기록을 불러오지 못했어요. 잠시 후 새로고침하세요.</p>`;
+    if (state.failed.top10 && state.failed.econ) {
+      message(panel, "기록을 불러오지 못했어요. 잠시 후 새로고침하세요.");
       return;
     }
     if (!state.selected) {
-      panel.innerHTML = `<p class="message">기록이 있는 날짜를 선택하세요.</p>`;
+      message(panel, "기록이 있는 날짜를 선택하세요.");
       return;
     }
 
@@ -384,13 +439,13 @@
     const tabs = document.createElement("div");
     tabs.className = "tabs";
     tabs.setAttribute("role", "tablist");
-    [["top10", "데일리 TOP10"], ["econ", "경제지표"]].forEach(([id, label]) => {
+    ["top10", "econ"].forEach((src) => {
       const t = document.createElement("button");
       t.className = "tab";
       t.setAttribute("role", "tab");
-      t.setAttribute("aria-selected", String(state.tab === id));
-      t.textContent = label;
-      t.addEventListener("click", () => { state.tab = id; renderPanel(); });
+      t.setAttribute("aria-selected", String(state.tab === src));
+      t.textContent = LABELS[src];
+      t.addEventListener("click", () => { state.tab = src; renderPanel(); });
       tabs.appendChild(t);
     });
     panel.appendChild(tabs);
@@ -398,37 +453,42 @@
     const body = document.createElement("div");
     body.className = "fade";
     panel.appendChild(body);
-
-    if (state.tab === "econ") {
-      body.innerHTML = `<p class="message">경제지표는 준비 중이에요.</p>`;
-    } else {
-      renderTop10(body, state.selected);
-    }
+    renderTab(body, state.tab, state.selected);
   }
 
-  async function renderTop10(body, date) {
-    if (!state.top10Dates.has(date)) {
-      body.innerHTML = `<p class="message">이 날짜에는 데일리 TOP10 기록이 없어요.</p>`;
+  async function renderTab(body, src, date) {
+    if (state.failed[src]) {
+      message(body, `${LABELS[src]} 기록을 불러오지 못했어요. 잠시 후 새로고침하세요.`);
+      return;
+    }
+    if (!state.dates[src].has(date)) {
+      message(body, `이 날짜에는 ${LABELS[src]} 기록이 없어요.`);
       return;
     }
 
-    let data = state.cache.get(date);
+    const key = `${src}:${date}`;
+    let data = state.cache.get(key);
     if (!data) {
-      body.innerHTML = `<p class="message">불러오는 중…</p>`;
+      message(body, "불러오는 중…");
       try {
-        const res = await fetch(SOURCES.top10.day(date), { cache: "no-store" });
+        const res = await fetch(dayUrl(src, date), { cache: "no-store" });
         if (!res.ok) throw new Error(res.status);
         data = await res.json();
-        state.cache.set(date, data);
+        state.cache.set(key, data);
       } catch (e) {
-        body.innerHTML = `<p class="message">이 날짜의 기록을 불러오지 못했어요. 잠시 후 다시 선택하세요.</p>`;
+        message(body, "이 날짜의 기록을 불러오지 못했어요. 잠시 후 다시 선택하세요.");
         return;
       }
       // 기다리는 사이 다른 날짜나 탭으로 바뀌었으면 그리지 않음
-      if (state.selected !== date || state.tab !== "top10") return;
+      if (state.selected !== date || state.tab !== src) return;
     }
 
     body.innerHTML = "";
+    if (src === "top10") drawTop10(body, data);
+    else drawEcon(body, data, date);
+  }
+
+  function drawTop10(body, data) {
     if (data.period) {
       const p = document.createElement("p");
       p.className = "period";
@@ -472,6 +532,79 @@
     body.appendChild(ol);
   }
 
+  function formatValue(item) {
+    const v = Math.round(item.close).toLocaleString("ko-KR");
+    if (item.symbol === "KRW=X") return `${v}원`;
+    if (item.symbol === "GC=F") return `$${v}`;
+    return v;
+  }
+
+  function expectedAsOf(group, date) {
+    if (group === "kr") return date;
+    if (group === "us") return prevWeekday(date);
+    return null; // 환율·금은 표시하지 않음
+  }
+
+  function drawEcon(body, data, date) {
+    const items = data.items || [];
+
+    ECON_GROUPS.forEach(([group, label]) => {
+      const rows = items.filter((it) => it.group === group);
+      if (!rows.length) return;
+
+      const section = document.createElement("section");
+      section.className = "econ-group";
+      const h = document.createElement("h3");
+      h.textContent = label;
+      section.appendChild(h);
+
+      rows.forEach((it) => {
+        const row = document.createElement("div");
+        row.className = "econ-row";
+
+        const name = document.createElement("div");
+        name.className = "econ-name";
+        name.textContent = it.name;
+
+        const value = document.createElement("div");
+        value.className = "econ-value";
+
+        const pct = document.createElement("div");
+        pct.className = "econ-pct";
+
+        if (it.close == null) {
+          value.textContent = "수집 실패";
+          value.classList.add("flat");
+        } else {
+          value.textContent = formatValue(it);
+          const p = it.change_pct;
+          pct.textContent = `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
+          pct.classList.add(p > 0 ? "up" : p < 0 ? "down" : "flat");
+
+          const expected = expectedAsOf(group, date);
+          if (expected && it.as_of && it.as_of !== expected) {
+            const [, mm, dd] = it.as_of.split("-").map(Number);
+            const basis = document.createElement("span");
+            basis.className = "basis";
+            basis.textContent = `휴장, ${mm}/${dd} 기준`;
+            name.appendChild(basis);
+          }
+        }
+
+        row.append(name, value, pct);
+        section.appendChild(row);
+      });
+
+      if (group === "us") {
+        const note = document.createElement("p");
+        note.className = "note";
+        note.textContent = US_NOTE;
+        section.appendChild(note);
+      }
+      body.appendChild(section);
+    });
+  }
+
   function selectDate(date) {
     state.selected = date;
     renderDays();
@@ -487,31 +620,34 @@
     setView({ y: state.view.y, m: Number(e.target.value) }));
 
   // ===== 시작 =====
+  async function loadIndex(src) {
+    try {
+      const res = await fetch(indexUrl(src), { cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      state.dates[src] = new Set(await res.json());
+    } catch (e) {
+      state.failed[src] = true;
+    }
+  }
+
   async function init() {
     const [ty, tm] = todayKST().split("-").map(Number);
     state.maxYM = { y: ty, m: tm };
 
-    try {
-      const res = await fetch(SOURCES.top10.index, { cache: "no-store" });
-      if (!res.ok) throw new Error(res.status);
-      const dates = await res.json();
-      state.top10Dates = new Set(dates);
-    } catch (e) {
-      state.loadError = true;
-    }
+    await Promise.all([loadIndex("top10"), loadIndex("econ")]);
 
-    const sorted = [...state.top10Dates].sort();
+    const sorted = [...new Set([...state.dates.top10, ...state.dates.econ])].sort();
     if (sorted.length) {
       const [fy, fm] = sorted[0].split("-").map(Number);
-      state.minYM = ymKey({ y: fy, m: fm }) < ymKey(state.maxYM) ? { y: fy, m: fm } : { ...state.maxYM };
+      const first = { y: fy, m: fm };
+      state.minYM = ymKey(first) < ymKey(state.maxYM) ? first : { ...state.maxYM };
     } else {
       state.minYM = { ...state.maxYM };
     }
 
     // 이번 달 안에서 가장 최근 기록이 있는 날짜를 자동 선택
     const prefix = `${ty}-${pad(tm)}-`;
-    const latestThisMonth = sorted.filter((d) => d.startsWith(prefix)).pop();
-    state.selected = latestThisMonth || null;
+    state.selected = sorted.filter((d) => d.startsWith(prefix)).pop() || null;
 
     setView(state.maxYM);
     renderPanel();
