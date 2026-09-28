@@ -606,8 +606,13 @@
     return v;
   }
 
+  function prevDay(date) {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  }
+
   function expectedAsOf(group, date) {
-    if (group === "us") return prevWeekday(date);
+    if (group === "us") return prevDay(date); // 전날 밤 미국 장이 없었으면 휴장
     return date; // 코스피·코스닥·환율·금: 그날 값이 아니면 휴장
   }
 
