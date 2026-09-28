@@ -607,9 +607,8 @@
   }
 
   function expectedAsOf(group, date) {
-    if (group === "kr") return date;
     if (group === "us") return prevWeekday(date);
-    return null; // 환율·금은 표시하지 않음
+    return date; // 코스피·코스닥·환율·금: 그날 값이 아니면 휴장
   }
 
   function drawEcon(body, data, date) {
@@ -644,17 +643,19 @@
           value.classList.add("flat");
         } else {
           value.textContent = formatValue(it);
-          const p = it.change_pct;
-          pct.textContent = `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
-          pct.classList.add(p > 0 ? "up" : p < 0 ? "down" : "flat");
 
           const expected = expectedAsOf(group, date);
           if (expected && it.as_of && it.as_of !== expected) {
+            // 휴장한 날은 등락률을 표시하지 않음
             const [, mm, dd] = it.as_of.split("-").map(Number);
             const basis = document.createElement("span");
             basis.className = "basis";
             basis.textContent = `휴장, ${mm}/${dd} 기준`;
             name.appendChild(basis);
+          } else {
+            const p = it.change_pct;
+            pct.textContent = `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
+            pct.classList.add(p > 0 ? "up" : p < 0 ? "down" : "flat");
           }
         }
 
